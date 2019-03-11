@@ -18,10 +18,10 @@ type Input int
 
 // An Action describes something an FSM will do.
 // It returns an Input to allow for automatic chaining of actions.
-type Action func(context.Context) Input
+type Action func(context.Context) (context.Context, Input)
 
 // NO_ACTION is useful for when you need a certain input to just change the state of the FSM without doing anytyhing else.
-func NO_ACTION(ctx context.Context) Input { return NO_INPUT }
+func NO_ACTION(ctx context.Context) (context.Context, Input) { return ctx, NO_INPUT }
 
 // An Outcome describes the result of running an FSM.
 // It describes which state to move to next, and an Action to perform.
@@ -88,7 +88,7 @@ func Define(states ...State) (*FSM, error) {
 
 // Spin the FSM one time.
 // This method is thread-safe.
-func (f *FSM) Spin(ctx context.Context, in Input) error {
+func (f *FSM) Spin(ctx context.Context, in Input) (context.Context, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -96,18 +96,18 @@ func (f *FSM) Spin(ctx context.Context, in Input) error {
 		s, ok := f.states[f.current]
 
 		if !ok {
-			return ImpossibleStateError(f.current)
+			return ctx, ImpossibleStateError(f.current)
 		}
 
 		do, ok := s.Outcomes[i]
 
 		if !ok {
-			return InvalidInputError{f.current, i}
+			return ctx, InvalidInputError{f.current, i}
 		}
 
-		i = do.Action(ctx)
+		ctx, i = do.Action(ctx)
 		f.current = do.State
 	}
 
-	return nil
+	return ctx, nil
 }

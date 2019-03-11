@@ -20,7 +20,7 @@ const (
 func assertState(t *testing.T, ctx context.Context, fsm *FSM, i Input, s int) {
 	oldState := fsm.current
 
-	err := fsm.Spin(ctx, i)
+	ctx, err := fsm.Spin(ctx, i)
 	if err != nil {
 		t.Fatal(err.Error())
 		return
@@ -94,9 +94,9 @@ func TestChain(t *testing.T) {
 		Index: test_state_1,
 		Outcomes: map[Input]Outcome{
 			test_input_1: Outcome{test_state_2,
-				func(ctx context.Context) Input { func1_hit = true; return test_input_2 }},
+				func(ctx context.Context) (context.Context, Input) { func1_hit = true; return ctx, test_input_2 }},
 			test_input_2: Outcome{test_state_3,
-				func(ctx context.Context) Input { func3_hit = true; return NO_INPUT }},
+				func(ctx context.Context) (context.Context, Input) { func3_hit = true; return ctx, NO_INPUT }},
 			test_input_3: Outcome{test_state_1, NO_ACTION},
 		},
 	}
@@ -105,7 +105,7 @@ func TestChain(t *testing.T) {
 		Outcomes: map[Input]Outcome{
 			test_input_1: Outcome{test_state_1, NO_ACTION},
 			test_input_2: Outcome{test_state_1,
-				func(ctx context.Context) Input { func2_hit = true; return test_input_2 }},
+				func(ctx context.Context) (context.Context, Input) { func2_hit = true; return ctx, test_input_2 }},
 			test_input_3: Outcome{test_state_1, NO_ACTION},
 		},
 	}
@@ -156,7 +156,7 @@ func TestImpossibleState(t *testing.T) {
 
 	// Put the FSM in an impossible state.
 	fsm.current = test_state_3
-	err = fsm.Spin(ctx, test_input_1)
+	ctx, err = fsm.Spin(ctx, test_input_1)
 	if err == nil {
 		t.Fatalf("FSM didn't error when spun in impossible state.")
 	}
@@ -192,7 +192,7 @@ func TestInvalidInput(t *testing.T) {
 	}
 
 	// Spin with invalid input value.
-	err = fsm.Spin(ctx, test_input_3)
+	ctx, err = fsm.Spin(ctx, test_input_3)
 	if err == nil {
 		t.Fatalf("FSM didn't error when spun with invalid input.")
 	}
