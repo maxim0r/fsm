@@ -102,6 +102,8 @@ func (f *FSM) Spin(ctx context.Context, in Input) (context.Context, error) {
 	f.Lock()
 	defer f.Unlock()
 
+	log.Tracef("FSM: get spin input [%d]", in)
+
 	for i := in; i != NO_INPUT; {
 		log.Tracef("FSM: process input [%d]", i)
 
