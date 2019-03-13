@@ -7,11 +7,16 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	NO_INPUT Input = -1
 )
+
+// External logger
+var log *logrus.Logger
 
 // An Input to give to an FSM.
 type Input int
@@ -71,7 +76,12 @@ func (err ClashingStateError) Error() string {
 
 // Define an FSM from a list of States.
 // Will return an  error if you try to use two states with the same index.
-func Define(states ...State) (*FSM, error) {
+func Define(logger *logrus.Logger, states ...State) (*FSM, error) {
+	log = logger
+	if logger == nil {
+		log = logrus.New()
+		log.Level = logrus.FatalLevel
+	}
 	stateMap := map[int]State{}
 	for _, s := range states {
 		if _, ok := stateMap[s.Index]; ok {
@@ -93,20 +103,23 @@ func (f *FSM) Spin(ctx context.Context, in Input) (context.Context, error) {
 	defer f.Unlock()
 
 	for i := in; i != NO_INPUT; {
-		s, ok := f.states[f.current]
+		log.Tracef("FSM: process input [%d]", i)
 
+		s, ok := f.states[f.current]
 		if !ok {
+			log.Tracef("FSM: invalid state [%d]", f.current)
 			return ctx, ImpossibleStateError(f.current)
 		}
 
 		do, ok := s.Outcomes[i]
-
 		if !ok {
+			log.Tracef("FSM: invalid input [%d] in current state [%d]", i, f.current)
 			return ctx, InvalidInputError{f.current, i}
 		}
 
 		ctx, i = do.Action(ctx)
 		f.current = do.State
+		log.Tracef("FSM: current state [%d]", f.current)
 	}
 
 	return ctx, nil
