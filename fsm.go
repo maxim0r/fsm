@@ -15,9 +15,6 @@ const (
 	NO_INPUT Input = -1
 )
 
-// External logger
-var log *logrus.Logger
-
 // An Input to give to an FSM.
 type Input int
 
@@ -45,8 +42,11 @@ type State struct {
 // FSM is the main structure defining a Finite State Machine.
 type FSM struct {
 	sync.Mutex
-	states  map[int]State
-	current int
+	states     map[int]State
+	current    int
+	log        *logrus.Logger
+	stateNames map[int]string
+	inputNames map[Input]string
 }
 
 // InvalidInputError indicates that an input was passed to an FSM which is not valid for its current state.
@@ -76,12 +76,7 @@ func (err ClashingStateError) Error() string {
 
 // Define an FSM from a list of States.
 // Will return an  error if you try to use two states with the same index.
-func Define(logger *logrus.Logger, states ...State) (*FSM, error) {
-	log = logger
-	if logger == nil {
-		log = logrus.New()
-		log.Level = logrus.FatalLevel
-	}
+func Define(states ...State) (*FSM, error) {
 	stateMap := map[int]State{}
 	for _, s := range states {
 		if _, ok := stateMap[s.Index]; ok {
@@ -90,9 +85,14 @@ func Define(logger *logrus.Logger, states ...State) (*FSM, error) {
 		stateMap[s.Index] = s
 	}
 
+	// Set default logger
+	log := logrus.New()
+	log.Level = logrus.FatalLevel
+
 	return &FSM{
 		states:  stateMap,
 		current: states[0].Index,
+		log:     log,
 	}, nil
 }
 
@@ -102,27 +102,51 @@ func (f *FSM) Spin(ctx context.Context, in Input) (context.Context, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	log.Tracef("FSM: get spin input [%d]", in)
+	f.log.Tracef("FSM: get spin input [%d][%s]", in, f.getInputName(in))
 
 	for i := in; i != NO_INPUT; {
-		log.Tracef("FSM: process input [%d]", i)
+
+		f.log.Tracef("FSM: process input [%d][%s]", i, f.getInputName(i))
 
 		s, ok := f.states[f.current]
 		if !ok {
-			log.Tracef("FSM: invalid state [%d]", f.current)
+			f.log.Tracef("FSM: invalid state [%d]", f.current)
 			return ctx, ImpossibleStateError(f.current)
 		}
 
 		do, ok := s.Outcomes[i]
 		if !ok {
-			log.Tracef("FSM: invalid input [%d] in current state [%d]", i, f.current)
+			f.log.Tracef("FSM: invalid input [%d][%s] in current state [%d][%s]", i, f.getInputName(i), f.current, f.getStateName(f.current))
 			return ctx, InvalidInputError{f.current, i}
 		}
 
 		ctx, i = do.Action(ctx)
 		f.current = do.State
-		log.Tracef("FSM: set current state [%d] with next input [%d]", f.current, i)
+		f.log.Tracef("FSM: set current state [%d] with next input [%d]", f.current, i)
 	}
 
 	return ctx, nil
+}
+
+// Set logger with description states and inputs strings
+func (f *FSM) SetLogger(logger *logrus.Logger, states map[int]string, inputs map[Input]string) {
+	if logger != nil {
+		f.log = logger
+	}
+}
+
+func (f *FSM) getInputName(input Input) string {
+	name, ok := f.inputNames[input]
+	if !ok {
+		return ""
+	}
+	return name
+}
+
+func (f *FSM) getStateName(state int) string {
+	name, ok := f.stateNames[state]
+	if !ok {
+		return ""
+	}
+	return name
 }
