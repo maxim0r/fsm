@@ -133,6 +133,8 @@ func (f *FSM) SetLogger(logger *logrus.Logger, states map[int]string, inputs map
 	if logger != nil {
 		f.log = logger
 	}
+	f.stateNames = states
+	f.inputNames = inputs
 }
 
 func (f *FSM) getInputName(input Input) string {
