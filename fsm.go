@@ -122,7 +122,7 @@ func (f *FSM) Spin(ctx context.Context, in Input) (context.Context, error) {
 
 		ctx, i = do.Action(ctx)
 		f.current = do.State
-		f.log.Tracef("FSM: set current state [%d] with next input [%d]", f.current, i)
+		f.log.Tracef("FSM: set current state [%d][%s] with next input [%d][%s]", f.current, f.getStateName(f.current), i, f.getInputName(i))
 	}
 
 	return ctx, nil
